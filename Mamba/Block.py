@@ -85,6 +85,7 @@ class MambaMixer(modeling_mamba.MambaMixer):
             scan_output = scan_output * self.act(gate)
         else: 
             # Loop
+            print('using loop')
             scan_outputs = []
             for i in range(seq_len):
                 ssm_state = discrete_A[:, :, i, :] * ssm_state + deltaB_u[:, :, i, :]      # [batch, intermediade_size, ssm_state]

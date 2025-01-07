@@ -2,14 +2,18 @@ import torch
 import torch.nn as nn
 import Mamba, importlib
 importlib.reload(Mamba)
+from transformers import MambaConfig
 from Mamba import MambaModel, MambaForCausalLM
 
 
 class MambaVAE(nn.Module):
     def __init__(self, max_length = 128):
         super().__init__()
-        self.encoder = MambaModel.from_pretrained('state-spaces/mamba-130m-hf')
-        self.decoder = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
+        config = MambaConfig.from_pretrained("state-spaces/mamba-130m-hf")
+        config.use_mambapy = True
+        config.num_hidden_layers = 12
+        self.encoder = MambaModel.from_pretrained('state-spaces/mamba-130m-hf', config=config)
+        self.decoder = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf', config=config)
         self.loss_fn = nn.CrossEntropyLoss(reduction='none')
         self.init_wpe(max_length)
 
@@ -30,8 +34,8 @@ class MambaVAE(nn.Module):
     
     def get_logits_loss(self, logits, labels, attention_mask):
         logits = logits.view(-1, logits.size(-1))
-        labels = labels.to(logits.device).view(-1)
-        attention_mask = attention_mask.to(logits.device).view(-1)
+        labels = labels.view(-1)
+        attention_mask = attention_mask.view(-1)
         loss = self.loss_fn(logits, labels) * attention_mask
         return loss.sum() / attention_mask.sum()
 
@@ -44,4 +48,4 @@ class MambaVAE(nn.Module):
                               attention_mask = attention_mask,
                               inputs_ssm_states = states).logits
         logits_loss = self.get_logits_loss(logits, input_ids, attention_mask)
-        return (logits_loss, kl_loss, logits, states)
+        return logits_loss, kl_loss, logits, states

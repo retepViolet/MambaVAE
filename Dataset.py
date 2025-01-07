@@ -5,9 +5,8 @@ from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained("state-spaces/mamba-130m-hf")
 
-
 def get_dataset(tot = None, eval_ratio = 0.1, max_length = 128):
-    dataset = load_dataset('wikipedia', '20220301.simple')['train']
+    dataset = load_dataset('wikipedia', '20220301.simple', trust_remote_code=True)['train']
     if tot is None: tot = len(dataset)
     else: dataset = dataset.select(range(tot))
 
@@ -21,6 +20,7 @@ def get_dataset(tot = None, eval_ratio = 0.1, max_length = 128):
                            return_tensors = 'pt')
         ones = torch.ones(inputs['attention_mask'].size(0), 1, dtype = inputs['attention_mask'].dtype)
         inputs['attention_mask'] = torch.cat([ones, inputs['attention_mask'][:, :-1]], dim=1)
+        inputs['labels'] = inputs['input_ids']
         return inputs
     dataset = dataset.map(tokenize, remove_columns = ['id','url','title','text'], batched = True)
     

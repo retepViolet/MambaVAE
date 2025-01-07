@@ -1,6 +1,8 @@
 .tmp.driveupload
 .tmp.drivedownload
 .vscode
+results
+logs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
