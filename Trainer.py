@@ -1,6 +1,6 @@
 import transformers
 from transformers import TrainingArguments
-from MambaVAE import MambaVAE
+from VAE import MambaVAE
 from transformers import MambaConfig, MambaForCausalLM, AutoTokenizer
 from Dataset import get_dataset
 

@@ -66,14 +66,13 @@ class MambaModel(modeling_mamba.MambaModel):
 
         hidden_states = inputs_embeds
         all_hidden_states = () if output_hidden_states else None
-        all_ssm_last_states = None
+        all_ssm_last_states = () if output_ssm_last_states else None
         for i, mixer_block in enumerate(self.layers):
             if self.gradient_checkpointing and self.training:
                 hidden_states, ssm_last_states = self._gradient_checkpointing_func(
                     mixer_block.__call__, 
                     hidden_states, 
-                    inputs_ssm_states, 
-                    output_ssm_last_states and i == len(self.layers) - 1,
+                    inputs_ssm_states[i] if inputs_ssm_states is not None else None, 
                     cache_params, 
                     cache_position, 
                     attention_mask
@@ -81,8 +80,7 @@ class MambaModel(modeling_mamba.MambaModel):
             else:
                 hidden_states, ssm_last_states = mixer_block(
                     hidden_states,
-                    inputs_ssm_states=inputs_ssm_states,
-                    output_ssm_last_states=output_ssm_last_states and i == len(self.layers) - 1,
+                    inputs_ssm_states=inputs_ssm_states[i] if inputs_ssm_states is not None else None,
                     cache_params=cache_params,
                     cache_position=cache_position,
                     attention_mask=attention_mask,
@@ -90,9 +88,9 @@ class MambaModel(modeling_mamba.MambaModel):
 
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
-            
+
             if output_ssm_last_states:
-                all_ssm_last_states = ssm_last_states
+                all_ssm_last_states = all_ssm_last_states + (ssm_last_states,)
 
         hidden_states = self.norm_f(hidden_states)
 
