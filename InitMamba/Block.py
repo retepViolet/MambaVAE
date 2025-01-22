@@ -30,7 +30,7 @@ class MambaMixer(modeling_mamba.MambaMixer):
         projected_states = self.in_proj(hidden_states).transpose(1, 2)
         ssm_state = None
         if self.training and cache_params is None:  # Doesn't support outputting the states -> used for training
-            contextualized_states = mamba_inner_fn(
+            contextualized_states, ssm_state = mamba_inner_fn(
                 projected_states,
                 self.conv1d.weight,
                 self.conv1d.bias if self.use_conv_bias else None,
@@ -44,6 +44,8 @@ class MambaMixer(modeling_mamba.MambaMixer):
                 self.D.float(),
                 delta_bias=self.dt_proj.bias.float(),
                 delta_softplus=True,
+                ssm_initial_state = inputs_ssm_states,
+                length = None if attention_mask is None else torch.sum(attention_mask, dim=-1, dtype=torch.long)
             )
 
         else:

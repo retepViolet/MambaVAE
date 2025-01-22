@@ -400,12 +400,13 @@ selective_scan_fwd(const at::Tensor &u, const at::Tensor &delta,
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{u.device()};
     auto stream = at::cuda::getCurrentCUDAStream().stream();
-    selective_scan_fwd_cuda<float, float>(params, stream);
-    // DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(u.scalar_type(), "selective_scan_fwd", [&] {
-    //     DISPATCH_WTYPE_FLOAT_AND_COMPLEX(A.scalar_type(), "selective_scan_fwd", [&] {
-    //         selective_scan_fwd_cuda<input_t, weight_t>(params, stream);
-    //     });
-    // });
+    // selective_scan_fwd_cuda<float, float>(params, stream);
+    DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(u.scalar_type(), "selective_scan_fwd", [&] {
+        selective_scan_fwd_cuda<input_t, float>(params, stream);
+        // DISPATCH_WTYPE_FLOAT_AND_COMPLEX(A.scalar_type(), "selective_scan_fwd", [&] {
+        //     selective_scan_fwd_cuda<input_t, weight_t>(params, stream);
+        // });
+    });
     std::vector<at::Tensor> result = {out, x, last_state};
     if (has_z) { result.push_back(out_z); }
     return result;
@@ -604,12 +605,13 @@ selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::CUDAGuard device_guard{u.device()};
     auto stream = at::cuda::getCurrentCUDAStream().stream();
-    selective_scan_bwd_cuda<float, float>(params, stream);
-    // DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(u.scalar_type(), "selective_scan_bwd", [&] {
-    //     DISPATCH_WTYPE_FLOAT_AND_COMPLEX(A.scalar_type(), "selective_scan_bwd", [&] {
-    //         selective_scan_bwd_cuda<input_t, weight_t>(params, stream);
-    //     });
-    // });
+    // selective_scan_bwd_cuda<float, float>(params, stream);
+    DISPATCH_ITYPE_FLOAT_AND_HALF_AND_BF16(u.scalar_type(), "selective_scan_bwd", [&] {
+        selective_scan_bwd_cuda<input_t, float>(params, stream);
+        // DISPATCH_WTYPE_FLOAT_AND_COMPLEX(A.scalar_type(), "selective_scan_bwd", [&] {
+        //     selective_scan_bwd_cuda<input_t, weight_t>(params, stream);
+        // });
+    });
     std::vector<at::Tensor> result = {du, ddelta, dA, dB.to(B.dtype()), dC.to(C.dtype()), dD, ddelta_bias, dssm_initial_state};
     if (has_z) { result.push_back(dz); }
     if (recompute_out_z) { result.push_back(out_z); }
