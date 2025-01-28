@@ -5,28 +5,27 @@ from transformers import AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained("state-spaces/mamba-130m-hf")
 
-def get_dataset(tot = None, eval_ratio = 0.1, max_length = 128):
-    dataset = load_dataset('wikipedia', '20220301.simple', trust_remote_code=True)['train']
+def get_dataset(tot = None, eval_ratio = 0.05, max_length = 128):
+    dataset_name = '20220301.simple'
+    dataset = load_dataset("arrow", data_files = './cache/'+'128.arrow', split = 'train').shuffle(seed=42)
+    # dataset = load_dataset('wikipedia', dataset_name, trust_remote_code=True)['train'].shuffle(seed=42)
     if tot is None: tot = len(dataset)
     else: dataset = dataset.select(range(tot))
 
-    def tokenize(examples):
-        # print(examples['text'])
-        text = ['\n' + i.replace('\n', ' ').replace('  ', ' ') for i in examples['text']]
-        inputs = tokenizer(text,
-                           truncation = True, 
-                           max_length = max_length, 
-                           padding = "max_length",
-                           return_tensors = 'pt')
-        # ones = torch.ones(inputs['attention_mask'].size(0), 1, dtype = inputs['attention_mask'].dtype)
-        # inputs['attention_mask'] = torch.cat([ones, inputs['attention_mask'][:, :-1]], dim=1)
-        # inputs['labels'] = inputs['input_ids']
-        return inputs
-    dataset = dataset.map(tokenize, remove_columns = ['id','url','title','text'], batched = True)
-    
+    # def tokenize(examples):
+    #     # print(examples['text'])
+    #     text = ['\n' + i.replace('\n', ' ').replace('  ', ' ') for i in examples['text']]
+    #     inputs = tokenizer(text,
+    #                        truncation = True, 
+    #                        max_length = max_length, 
+    #                        padding = "max_length",
+    #                        return_tensors = 'pt')
+    #     return inputs
+    # dataset = dataset.map(tokenize, remove_columns = ['id','url','title','text'], batched = True,
+    #             cache_file_name = './cache/'+dataset_name, load_from_cache_file = False)
     eval_size= int(tot * eval_ratio)
-    eval_dataset = dataset.select(range(eval_size))
     train_dataset = dataset.select(range(eval_size, tot))
+    eval_dataset = dataset.select(range(eval_size))
     return train_dataset, eval_dataset
 
 

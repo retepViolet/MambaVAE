@@ -20,6 +20,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         input_ids: modeling_mamba.Optional[torch.LongTensor] = None,
         attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_embeds: modeling_mamba.Optional[torch.FloatTensor] = None,
+        layer_range: modeling_mamba.Optional[range] = None,
         inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
         cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
         labels: modeling_mamba.Optional[torch.LongTensor] = None,
@@ -42,6 +43,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
             input_ids,
             cache_params=cache_params,
             inputs_embeds=inputs_embeds,
+            layer_range=layer_range,
             inputs_ssm_states=inputs_ssm_states,
             output_hidden_states=output_hidden_states,
             output_ssm_last_states=output_ssm_last_states,
@@ -62,8 +64,13 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
             shift_logits = logits[..., :-1, :].contiguous()
             shift_labels = labels[..., 1:].contiguous()
             # Flatten the tokens
-            loss_fct = modeling_mamba.CrossEntropyLoss()
+            loss_fct = modeling_mamba.CrossEntropyLoss(reduction = 'none')
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            if attention_mask is not None:
+                shift_mask = attention_mask[..., :-1, :].contiguous()
+                loss = (loss * shift_mask).sum() / attention_mask.sum()
+            else:
+                loss = loss.mean()
 
         if not return_dict:
             output = (logits,) + mamba_outputs[1:]

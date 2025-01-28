@@ -22,6 +22,7 @@ class MambaModel(modeling_mamba.MambaModel):
         self,
         input_ids: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_embeds: modeling_mamba.Optional[torch.LongTensor] = None,
+        layer_range: modeling_mamba.Optional[range] = None,
         inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
         cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
         use_cache: modeling_mamba.Optional[bool] = None,
@@ -67,20 +68,21 @@ class MambaModel(modeling_mamba.MambaModel):
         hidden_states = inputs_embeds
         all_hidden_states = () if output_hidden_states else None
         all_ssm_last_states = () if output_ssm_last_states else None
-        for i, mixer_block in enumerate(self.layers):
+        if layer_range is None: layer_range = range(self.config.num_hidden_layers)
+        for i in layer_range:
             if self.gradient_checkpointing and self.training:
                 hidden_states, ssm_last_states = self._gradient_checkpointing_func(
-                    mixer_block.__call__, 
+                    self.layers[i].__call__, 
                     hidden_states, 
-                    inputs_ssm_states, # if i == len(self.layers)-1 else None, 
+                    inputs_ssm_states if i == len(self.layers)-1 else None, 
                     cache_params, 
                     cache_position, 
                     attention_mask
                 )
             else:
-                hidden_states, ssm_last_states = mixer_block(
+                hidden_states, ssm_last_states = self.layers[i](
                     hidden_states,
-                    inputs_ssm_states=inputs_ssm_states, # if i == len(self.layers)-1 else None,
+                    inputs_ssm_states=inputs_ssm_states if i == len(self.layers)-1 else None,
                     cache_params=cache_params,
                     cache_position=cache_position,
                     attention_mask=attention_mask,
@@ -92,7 +94,8 @@ class MambaModel(modeling_mamba.MambaModel):
             if output_ssm_last_states:
                 all_ssm_last_states = ssm_last_states
 
-        hidden_states = self.norm_f(hidden_states)
+            if i == self.config.num_hidden_layers - 1:
+                hidden_states = self.norm_f(hidden_states)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)

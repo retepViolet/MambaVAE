@@ -8,7 +8,7 @@ import InitMamba
 
 
 class Trainer(transformers.Trainer):
-    def __init__(self, *args, kl_warmup = 300, **kwargs):
+    def __init__(self, *args, kl_warmup = 1000, **kwargs):
         super().__init__(*args, **kwargs)
         self.current_step = 0
         self.kl_warmup = kl_warmup
@@ -40,6 +40,7 @@ class Trainer(transformers.Trainer):
         return loss
 
     def save_model(self, output_dir=None, _internal_call=False):
+        print('---saving model---')
         os.makedirs(output_dir, exist_ok=True)
         torch.save(self.model.state_dict(), output_dir+'/model.pth')
 
@@ -48,25 +49,28 @@ if __name__ == '__main__':
     # config = MambaConfig.from_pretrained("state-spaces/mamba-130m-hf")
     # config.use_mambapy = True
     model = MambaVAE()
+    model.load_state_dict(torch.load('./results/checkpoint-18288/model.pth'))
     # model = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
-    train_dataset, eval_dataset = get_dataset(1000)
+    train_dataset, eval_dataset = get_dataset()
 
     training_args = TrainingArguments(
         output_dir = './results',
         learning_rate = 1e-3,
-        warmup_steps = 10,
-        num_train_epochs = 10,
+        warmup_steps = 1000,
+        num_train_epochs = 3,
         per_device_train_batch_size = 32,
-        per_device_eval_batch_size = 16,
+        per_device_eval_batch_size = 32,
         fp16 = True,
         eval_strategy = 'epoch',
-        save_strategy = 'epoch',
+        # eval_steps = 10,
+        save_strategy = 'epoc',
+        # save_steps = 10,
+        logging_steps = 500,
         load_best_model_at_end = True,
         metric_for_best_model = 'eval_loss',
         greater_is_better = False,
         save_total_limit = 1,
         logging_dir = './logs',
-        logging_steps = 29,
         report_to = "none",
         max_grad_norm = 1.0,
         label_names = ["input_ids"],
@@ -81,22 +85,24 @@ if __name__ == '__main__':
     )
     trainer.train()
 
-
     # final test --------------------
-
     model.eval()
-    for i in range(5):
+    for i in range(20):
       input_ids = torch.tensor(train_dataset[i]['input_ids']).cuda().unsqueeze(0)
       attention_mask = torch.tensor(train_dataset[i]['attention_mask']).cuda().unsqueeze(0)
-      tokens = model(input_ids, attention_mask)[2].argmax(-1)
+      res = model(input_ids, attention_mask)
+      tokens = res[2].argmax(-1)
       print('-------------------------')
       print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
       print('targ: ', tokenizer.batch_decode(input_ids, skip_special_tokens=True)[0])
+      print('logits_loss: ', res[0].item(), '; kl_loss: ', res[1].item())
     print('###################################################')
-    for i in range(5):
+    for i in range(20):
       input_ids = torch.tensor(eval_dataset[i]['input_ids']).cuda().unsqueeze(0)
       attention_mask = torch.tensor(eval_dataset[i]['attention_mask']).cuda().unsqueeze(0)
-      tokens = model(input_ids, attention_mask)[2].argmax(-1)
+      res = model(input_ids, attention_mask)
+      tokens = res[2].argmax(-1)
       print('-------------------------')
       print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
       print('targ: ', tokenizer.batch_decode(input_ids, skip_special_tokens=True)[0])
+      print('logits_loss: ', res[0].item(), '; kl_loss: ', res[1].item())
