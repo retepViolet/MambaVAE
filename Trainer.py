@@ -19,7 +19,7 @@ class Trainer(transformers.Trainer):
     def compute_loss(self, model, inputs, return_outputs = False, num_items_in_batch = None):
         outputs = model(**inputs)
         logits_loss, kl_loss = outputs[0], outputs[1]
-        self.kl_decay = min(1, self.current_step / self.kl_warmup) * 1e-5
+        self.kl_decay = min(1, self.current_step / self.kl_warmup) * 1e-8
         total_loss = logits_loss + kl_loss * self.kl_decay
         # 记录
         self.mean_kl_loss += kl_loss / self.args.logging_steps
@@ -49,23 +49,23 @@ if __name__ == '__main__':
     # config = MambaConfig.from_pretrained("state-spaces/mamba-130m-hf")
     # config.use_mambapy = True
     model = MambaVAE()
-    model.load_state_dict(torch.load('./results/checkpoint-18288/model.pth'))
+    model.load_state_dict(torch.load('./results/result2/model.pth', weights_only=True))
     # model = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
     train_dataset, eval_dataset = get_dataset()
 
     training_args = TrainingArguments(
         output_dir = './results',
-        learning_rate = 1e-3,
+        learning_rate = 1e-4,
         warmup_steps = 1000,
-        num_train_epochs = 3,
+        num_train_epochs = 2,
         per_device_train_batch_size = 32,
         per_device_eval_batch_size = 32,
         fp16 = True,
         eval_strategy = 'epoch',
         # eval_steps = 10,
-        save_strategy = 'epoc',
+        save_strategy = 'epoch',
         # save_steps = 10,
-        logging_steps = 500,
+        logging_steps = 100,
         load_best_model_at_end = True,
         metric_for_best_model = 'eval_loss',
         greater_is_better = False,
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         report_to = "none",
         max_grad_norm = 1.0,
         label_names = ["input_ids"],
-        weight_decay = 0.1
+        # weight_decay = 0.1
     )
 
     trainer = Trainer(
@@ -84,6 +84,7 @@ if __name__ == '__main__':
         eval_dataset = eval_dataset
     )
     trainer.train()
+    # print(trainer.evaluate())
 
     # final test --------------------
     model.eval()

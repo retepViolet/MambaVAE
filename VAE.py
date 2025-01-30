@@ -30,8 +30,8 @@ class MambaVAE(nn.Module):
         kl_loss = torch.tensor(0, device = mu.device)
         if do_sample or self.training: 
           kl_loss = 0.5 * mu.pow(2).sum()
-          mu = mu + torch.randn_like(mu) * 0.5
-        return mu, kl_loss
+          mu = mu + torch.randn_like(mu) * 0.01
+        return mu, kl_loss / mu.shape[0]
 
     # (logits_loss, kl_loss, logits, hidden_states)
     def forward(self, input_ids, attention_mask = None, do_sample = False):
@@ -50,4 +50,4 @@ class MambaVAE(nn.Module):
                             attention_mask = attention_mask,
                             inputs_ssm_states = states,
                             labels = input_ids)
-        return res.loss, kl_loss / input_ids.shape[0], res.logits, states
+        return res.loss, kl_loss, res.logits, states

@@ -67,7 +67,8 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
             loss_fct = modeling_mamba.CrossEntropyLoss(reduction = 'none')
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             if attention_mask is not None:
-                shift_mask = attention_mask[..., :-1, :].contiguous()
+                attention_mask = attention_mask.to(logits.device)
+                shift_mask = attention_mask[..., :-1].contiguous().view(-1)
                 loss = (loss * shift_mask).sum() / shift_mask.sum()
             else:
                 loss = loss.mean()
