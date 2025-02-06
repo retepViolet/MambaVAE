@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 from transformers import MambaConfig
+
+import importlib, InitMamba
+importlib.reload(InitMamba)
 from InitMamba import MambaModel, MambaForCausalLM
 
 

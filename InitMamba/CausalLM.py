@@ -9,6 +9,56 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         super().__init__(config)
         self.backbone = MambaModel(config)
 
+    def prepare_inputs_for_generation(
+        self,
+        input_ids,
+        inputs_embeds=None,
+        use_cache=None,
+        cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
+        cache_position: modeling_mamba.Optional[torch.LongTensor] = None,
+        attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
+        inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
+        **kwargs,
+    ):
+        # Overwitten -- uses `cache_params` as opposed to `past_key_values`
+
+        if use_cache:
+            # `cache_position` should have been initialized in `generate`
+            if cache_position is None:
+                raise ValueError(
+                    "`cache_position` should not be None as it should have been initialized in "
+                    "`model.generate`, you are responsible for passing in a valid `cache_position` if "
+                    "you are calling `prepare_inputs_for_generation` directly with `use_cache=True`"
+                )
+            if cache_position[0] > 0:
+                input_ids = input_ids[:, -1].unsqueeze(-1)
+
+                if attention_mask is not None:
+                    attention_mask = None
+
+            else:
+                # we initialize the `cache_position` to full size of `conv_states` at prefill stage
+                # considering padding will be applied when input length is shorter, and truncation
+                # will be applied when it is longer, so it will be equivalent to always have it match
+                # the length of `cache_params.conv_states`, which is `config.conv_kernel`
+                cache_position = torch.arange(0, self.config.conv_kernel, device=input_ids.device)
+
+        if inputs_embeds is not None and cache_params is None:
+            model_inputs = {"inputs_embeds": inputs_embeds}
+        else:
+            model_inputs = {"input_ids": input_ids.contiguous()}
+
+        model_inputs.update(
+            {
+                "cache_params": cache_params,
+                "use_cache": use_cache,
+                "cache_position": cache_position,
+                "attention_mask": attention_mask,
+                "inputs_ssm_states": inputs_ssm_states,
+            }
+        )
+        return model_inputs
+
     @modeling_mamba.add_start_docstrings_to_model_forward(modeling_mamba.MAMBA_INPUTS_DOCSTRING)
     @modeling_mamba.add_code_sample_docstrings(
         checkpoint=modeling_mamba._CHECKPOINT_FOR_DOC,
