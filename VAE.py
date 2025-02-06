@@ -10,6 +10,7 @@ from InitMamba import MambaModel, MambaForCausalLM
 class MambaVAE(nn.Module):
     def __init__(self, max_length = 128):
         super().__init__()
+        self.max_length = max_length
         config = MambaConfig.from_pretrained("state-spaces/mamba-130m-hf")
         # config.num_hidden_layers = 12
         self.encoder = MambaModel.from_pretrained('state-spaces/mamba-130m-hf', config=config)
@@ -35,6 +36,14 @@ class MambaVAE(nn.Module):
           kl_loss = 0.5 * mu.pow(2).sum()
           mu = mu + torch.randn_like(mu) * 0.1
         return mu, kl_loss / mu.shape[0]
+    
+    def add_rand_token(self, input_ids):
+        batch_size = input_ids.shape[0]
+        pos = (torch.rand(self.max_length//20, batch_size, device=input_ids.device) * self.max_length).long()
+        rand_token = (torch.rand(self.max_length//20, batch_size, device=input_ids.device) * 50276 + 1).long()
+        new_input_ids = input_ids
+        new_input_ids[torch.arange(batch_size),pos] = rand_token
+        return new_input_ids
 
     # (logits_loss, kl_loss, logits, hidden_states)
     def forward(self, input_ids, attention_mask = None, do_sample = False):
@@ -47,7 +56,7 @@ class MambaVAE(nn.Module):
                             output_ssm_last_states = True).ssm_last_states
         # states = self.encode(input_ids, attention_mask)
         states, kl_loss = self.sample(states, do_sample)
-        # res = self.decode(states, input_ids, attention_mask)
+        # res = self.decode(states, self.add_rand_token(input_ids), attention_mask)
         res = self.decoder(inputs_embeds = hidden_states, 
                             layer_range = range(21, 24),
                             attention_mask = attention_mask,
