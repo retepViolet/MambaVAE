@@ -107,6 +107,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         logits = self.lm_head(hidden_states.to(self.lm_head.weight.dtype)).float()
 
         loss = None
+        if labels is None: labels = input_ids
         if labels is not None:
             # move labels to correct device to enable model parallelism
             labels = labels.to(logits.device)

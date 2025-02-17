@@ -1,25 +1,33 @@
 import transformers
 from transformers import TrainingArguments
-from transformers import MambaConfig, MambaForCausalLM, AutoTokenizer
 from Dataset import get_dataset, tokenizer
+from datasets import load_dataset
 import torch, os
 from VAE import MambaVAE
-import InitMamba
 
 
 class Trainer(transformers.Trainer):
-    def __init__(self, *args, kl_warmup = 1000, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.current_step = 0
-        self.kl_warmup = kl_warmup
-        self.mean_kl_loss = 0
-        self.kl_decay = 0
+        ###
+        self.no_kl_step = 20000
+        self.kl_warmup = 10000
+        self.max_kl_decay = 1e-2
+        self.min_kl_decay = 1e-3
+        ###
+        self.kl_decay = self.min_kl_decay
         self.mean_logits_loss = 0
+        self.current_step = 0
+        self.mean_kl_loss = 0
 
     def compute_loss(self, model, inputs, return_outputs = False, num_items_in_batch = None):
         outputs = model(**inputs)
         logits_loss, kl_loss = outputs[0], outputs[1]
-        self.kl_decay = min(1, self.current_step / self.kl_warmup) * 1e-4
+
+        if self.current_step > self.no_kl_step:
+          ratio = min(1, (self.current_step - self.no_kl_step) / self.kl_warmup)
+          self.kl_decay =  ratio * (self.max_kl_decay - self.min_kl_decay) + self.min_kl_decay
+        
         total_loss = logits_loss + kl_loss * self.kl_decay
         # 记录
         self.mean_kl_loss += kl_loss / self.args.logging_steps
@@ -55,15 +63,21 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    model = MambaVAE()
-    model.load_state_dict(torch.load('./results/result6/model.pth', weights_only=True))
+    dataset = load_dataset("arrow", data_files = './cache/CoT_answer.arrow', split = 'train')
+    print(dataset)
+    tot = len(dataset)
+    eval_size= int(tot * 0.05)
+    train_dataset = dataset.select(range(eval_size, tot))
+    eval_dataset = dataset.select(range(eval_size))
 
-    train_dataset, eval_dataset = get_dataset()
+    model = MambaVAE()
+    model.load_state_dict(torch.load('./results/result9/model.pth', weights_only=True))
+    
     training_args = TrainingArguments(
-        learning_rate = 1e-3,
-        warmup_steps = 2000,
-        num_train_epochs = 2,
-        logging_steps = 1000,
+        learning_rate = 1e-4,
+        warmup_steps = 100,
+        num_train_epochs = 1,
+        logging_steps = 100,
         ###
         per_device_train_batch_size = 32,
         per_device_eval_batch_size = 32,
@@ -86,7 +100,8 @@ if __name__ == '__main__':
         train_dataset = train_dataset,
         eval_dataset = eval_dataset
     )
-    # trainer.train() # resume_from_checkpoint = './results/result4'
+    trainer.train()
+    # print(trainer.evaluate())
 
     # final test --------------------
     model.eval()
