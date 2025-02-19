@@ -11,9 +11,9 @@ class MambaVAE(nn.Module):
     def __init__(self):
         super().__init__()
         config = MambaConfig.from_pretrained('state-spaces/mamba-130m-hf')
-        config.num_hidden_layers  = 12
-        self.encoder = MambaModel.from_pretrained('state-spaces/mamba-130m-hf', config=config)
-        self.decoder = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
+        self.decoder = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf', config = config)
+        # config.num_hidden_layers  = 12
+        self.encoder = MambaModel.from_pretrained('state-spaces/mamba-130m-hf', config = config)
         # for name, param in self.named_parameters():
         #   if '23' not in name and '22' not in name and '21' not in name:
         #     param.requires_grad = False
@@ -27,6 +27,7 @@ class MambaVAE(nn.Module):
         return self.decoder(input_ids = self.add_rand_token(input_ids) if self.training else input_ids,
                             attention_mask = attention_mask,
                             inputs_ssm_states = states,
+                            inputs_ssm_layer = 23,
                             labels = input_ids)
     
     def sample(self, mu):

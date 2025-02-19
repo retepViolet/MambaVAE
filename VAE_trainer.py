@@ -1,6 +1,6 @@
 import transformers
 from transformers import TrainingArguments
-from Dataset import get_dataset, tokenizer
+from data.Dataset import get_dataset, tokenizer
 from datasets import load_dataset
 import torch, os
 from VAE import MambaVAE
@@ -12,7 +12,7 @@ class Trainer(transformers.Trainer):
         ###
         self.no_kl_step = 20000
         self.kl_warmup = 10000
-        self.max_kl_decay = 1e-2
+        self.max_kl_decay = 1e-3
         self.min_kl_decay = 1e-3
         ###
         self.kl_decay = self.min_kl_decay
@@ -63,7 +63,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_dataset("arrow", data_files = './cache/CoT_answer.arrow', split = 'train')
+    dataset = load_dataset("arrow", data_files = './data/CoT_answer.arrow', split = 'train')
     print(dataset)
     tot = len(dataset)
     eval_size= int(tot * 0.05)
@@ -74,10 +74,10 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load('./results/result9/model.pth', weights_only=True))
     
     training_args = TrainingArguments(
-        learning_rate = 1e-4,
-        warmup_steps = 100,
+        learning_rate = 6e-5,
+        warmup_steps = 1000,
         num_train_epochs = 1,
-        logging_steps = 100,
+        logging_steps = 1000,
         ###
         per_device_train_batch_size = 32,
         per_device_eval_batch_size = 32,

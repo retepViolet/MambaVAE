@@ -2,7 +2,6 @@ import torch, transformers, os
 from transformers import TrainingArguments, AutoTokenizer, default_data_collator
 from InitMamba import MambaForCausalLM
 from datasets import load_dataset
-import Dataset
 
 
 model = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf').cuda()
