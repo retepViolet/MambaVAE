@@ -20,8 +20,6 @@ try:
 except ImportError:
     from . import selective_scan_cuda
 
-
-
 class SelectiveScanFn(torch.autograd.Function):
 
     @staticmethod

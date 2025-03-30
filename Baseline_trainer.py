@@ -1,26 +1,26 @@
 import torch, transformers, os
 from transformers import TrainingArguments, AutoTokenizer, default_data_collator
-from InitMamba import MambaForCausalLM
-from datasets import load_dataset
+from Baseline import Baseline
+from datasets import load_from_disk
 
-
-model = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf').cuda()
-dataset = load_dataset("arrow", data_files = './cache/CoT_full.arrow', split = 'train').select(range(100000))
+dataset = load_from_disk("./data/CoT3")
 print(dataset)
 tot = len(dataset)
 eval_size= int(tot * 0.05)
 train_dataset = dataset.select(range(eval_size, tot))
 eval_dataset = dataset.select(range(eval_size))
 
+model = Baseline().cuda()
 
 training_args = TrainingArguments(
     learning_rate = 6e-4,
-    warmup_steps = 100,
-    num_train_epochs = 2,
+    warmup_steps = 1000,
+    num_train_epochs = 1,
     logging_steps = 100,
+    weight_decay = 0.01,
     ###
-    per_device_train_batch_size = 32,
-    per_device_eval_batch_size = 32,
+    per_device_train_batch_size = 64,
+    per_device_eval_batch_size = 64,
     fp16 = True,
     eval_strategy = 'epoch',
     save_strategy = 'epoch',
@@ -32,7 +32,7 @@ training_args = TrainingArguments(
     output_dir = './results',
     report_to = "none",
     max_grad_norm = 1.0,
-    label_names = ["input_ids"],
+    label_names = ["full_ids", "full_mask", "full_loss_mask"],
 )
 
 class Trainer(transformers.Trainer):
@@ -48,4 +48,4 @@ trainer = Trainer(
     eval_dataset = eval_dataset,
     data_collator=default_data_collator
 )
-trainer.train() # resume_from_checkpoint = './results/result4'
+trainer.train()

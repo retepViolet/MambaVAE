@@ -18,10 +18,11 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         cache_position: modeling_mamba.Optional[torch.LongTensor] = None,
         attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
+        inputs_ssm_layer: modeling_mamba.Optional[int] = None,
         **kwargs,
     ):
         # Overwitten -- uses `cache_params` as opposed to `past_key_values`
-
+        if inputs_ssm_layer is None: inputs_ssm_layer = 23
         if use_cache:
             # `cache_position` should have been initialized in `generate`
             if cache_position is None:
@@ -55,6 +56,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
                 "cache_position": cache_position,
                 "attention_mask": attention_mask,
                 "inputs_ssm_states": inputs_ssm_states,
+                "inputs_ssm_layer": inputs_ssm_layer,
             }
         )
         return model_inputs
@@ -69,6 +71,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         self,
         input_ids: modeling_mamba.Optional[torch.LongTensor] = None,
         attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
+        loss_mask: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_embeds: modeling_mamba.Optional[torch.FloatTensor] = None,
         layer_range: modeling_mamba.Optional[range] = None,
         inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
@@ -119,9 +122,13 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
             # Flatten the tokens
             loss_fct = modeling_mamba.CrossEntropyLoss(reduction = 'none')
             loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-            if attention_mask is not None:
+            if loss_mask is not None:
+                loss_mask = loss_mask.to(logits.device)
+                shift_mask = loss_mask[..., 1:].contiguous().view(-1)
+                loss = (loss * shift_mask).sum() / shift_mask.sum()
+            elif attention_mask is not None:
                 attention_mask = attention_mask.to(logits.device)
-                shift_mask = attention_mask[..., :-1].contiguous().view(-1)
+                shift_mask = attention_mask[..., 1:].contiguous().view(-1)
                 loss = (loss * shift_mask).sum() / shift_mask.sum()
             else:
                 loss = loss.mean()

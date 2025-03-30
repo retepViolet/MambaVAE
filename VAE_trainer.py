@@ -1,7 +1,7 @@
 import transformers
 from transformers import TrainingArguments
 from data.Dataset import get_dataset, tokenizer
-from datasets import load_dataset
+from datasets import load_from_disk
 import torch, os
 from VAE import MambaVAE
 
@@ -10,10 +10,10 @@ class Trainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         ###
-        self.no_kl_step = 20000
-        self.kl_warmup = 10000
-        self.max_kl_decay = 1e-3
-        self.min_kl_decay = 1e-3
+        self.no_kl_step = 9000
+        self.kl_warmup = 4500
+        self.max_kl_decay = 1
+        self.min_kl_decay = 1e-9
         ###
         self.kl_decay = self.min_kl_decay
         self.mean_logits_loss = 0
@@ -52,35 +52,29 @@ class Trainer(transformers.Trainer):
         os.makedirs(output_dir, exist_ok=True)
         torch.save(self.model.state_dict(), output_dir+'/model.pth')
 
-    def _load_from_checkpoint(self, checkpoint):
-        print(f"Loading model from {checkpoint} ...")
-        self.create_optimizer()
-        self.create_scheduler(num_training_steps = 25000)
-        self.model.load_state_dict(torch.load(f"{checkpoint}/model.pth", weights_only=True))
-        self.optimizer.load_state_dict(torch.load(f"{checkpoint}/optimizer.pt", weights_only=True))
-        self.lr_scheduler.load_state_dict(torch.load(f"{checkpoint}/scheduler.pt", weights_only=True))
-
 
 
 if __name__ == '__main__':
-    dataset = load_dataset("arrow", data_files = './data/CoT_answer.arrow', split = 'train')
+    dataset = load_from_disk("./data/CoT3")
     print(dataset)
     tot = len(dataset)
     eval_size= int(tot * 0.05)
     train_dataset = dataset.select(range(eval_size, tot))
     eval_dataset = dataset.select(range(eval_size))
+    # train_dataset, eval_dataset = get_dataset()
 
     model = MambaVAE()
-    model.load_state_dict(torch.load('./results/result9/model.pth', weights_only=True))
+    # model.load_state_dict(torch.load('./results/CoT_vae2/model.pth', weights_only=True), strict=False)
     
     training_args = TrainingArguments(
-        learning_rate = 6e-5,
+        learning_rate = 6e-4,
         warmup_steps = 1000,
         num_train_epochs = 1,
-        logging_steps = 1000,
+        logging_steps = 10,
+        weight_decay = 0.01,
         ###
-        per_device_train_batch_size = 32,
-        per_device_eval_batch_size = 32,
+        per_device_train_batch_size = 64,
+        per_device_eval_batch_size = 64,
         fp16 = True,
         eval_strategy = 'epoch',
         save_strategy = 'epoch',
@@ -92,7 +86,7 @@ if __name__ == '__main__':
         output_dir = './results',
         report_to = "none",
         max_grad_norm = 1.0,
-        label_names = ["input_ids"]
+        label_names = ["full_ids", "full_mask", "full_loss_mask", "question_mask"]
     )
     trainer = Trainer(
         model = model,
@@ -104,23 +98,26 @@ if __name__ == '__main__':
     # print(trainer.evaluate())
 
     # final test --------------------
-    model.eval()
+    model.train()
     for i in range(20):
-      input_ids = torch.tensor(train_dataset[i]['input_ids']).cuda().unsqueeze(0)
-      attention_mask = torch.tensor(train_dataset[i]['attention_mask']).cuda().unsqueeze(0)
-      res = model(input_ids, attention_mask)
+      data = {}
+      for key in train_dataset[i].keys():
+        data[key] = torch.tensor(train_dataset[i][key], device = 'cuda').unsqueeze(0)
+      res = model(**data)
       tokens = res[2].argmax(-1)
       print('-------------------------')
-      print('pred: ', tokenizer.batch_decode(tokens[:,:-1], skip_special_tokens=True)[0])
-      print('targ: ', tokenizer.batch_decode(input_ids, skip_special_tokens=True)[0])
+      print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=False)[0])
+      print('targ: ', tokenizer.batch_decode(data['full_ids'][:,1:], skip_special_tokens=False)[0])
       print('logits_loss: ', res[0].item(), '; kl_loss: ', res[1].item())
     print('###################################################')
+    model.eval()
     for i in range(20):
-      input_ids = torch.tensor(eval_dataset[i]['input_ids']).cuda().unsqueeze(0)
-      attention_mask = torch.tensor(eval_dataset[i]['attention_mask']).cuda().unsqueeze(0)
-      res = model(input_ids, attention_mask)
+      data = {}
+      for key in eval_dataset[i].keys():
+        data[key] = torch.tensor(eval_dataset[i][key], device = 'cuda').unsqueeze(0)
+      res = model(**data)
       tokens = res[2].argmax(-1)
       print('-------------------------')
-      print('pred: ', tokenizer.batch_decode(tokens[:,:-1], skip_special_tokens=True)[0])
-      print('targ: ', tokenizer.batch_decode(input_ids, skip_special_tokens=True)[0])
+      print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=False)[0])
+      print('targ: ', tokenizer.batch_decode(data['full_ids'][:,1:], skip_special_tokens=False)[0])
       print('logits_loss: ', res[0].item(), '; kl_loss: ', res[1].item())

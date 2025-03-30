@@ -29,7 +29,7 @@ class MambaMixer(modeling_mamba.MambaMixer):
         # 1. Gated MLP's linear projection
         projected_states = self.in_proj(hidden_states).transpose(1, 2)
         ssm_state = None
-        if self.training and cache_params is None:  # Doesn't support outputting the states -> used for training
+        if self.training and cache_params is None:
             contextualized_states, ssm_state = mamba_inner_fn(
                 projected_states,
                 self.conv1d.weight,
