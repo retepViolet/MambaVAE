@@ -66,6 +66,7 @@ def CoT_full(tot = None):
     return dataset
 
 
+
 def CoT(tot = None, max_length = 256):
     dataset = load_dataset('kaist-ai/CoT-Collection', trust_remote_code=True)['train'].shuffle(42)
     dataset = dataset.filter(lambda example: len(example["source"]) + len(example["rationale"]) + len(example["target"]) < 1200)
@@ -104,7 +105,8 @@ def CoT(tot = None, max_length = 256):
     return dataset
 
 
-def CoT_image(tot = None, batch_size = 512):
+
+def CoT_image(tot = None, batch_size = 1024):
     dataset = load_from_disk("./data/CoT3")
     if tot is not None:
         dataset = dataset.select(range(tot))
@@ -117,16 +119,14 @@ def CoT_image(tot = None, batch_size = 512):
         target = vae.encode(torch.tensor(data['full_ids'], device = 'cuda'), torch.tensor(data['full_mask'], device = 'cuda'))[0].clamp(-1, 1)
         condition = vae.encode(torch.tensor(data['question_ids'], device = 'cuda'), torch.tensor(data['question_mask'], device = 'cuda'))[0].clamp(-1, 1)
         return {
-          'target': target.half(),
-          'condition': condition.half()
+          'target': target.half().cpu(),
+          'condition': condition.half().cpu()
         }
-
-    dataset = dataset.map(get_image, batch_size = batch_size, remove_columns = ['question_ids', 'question_mask', 'answer_ids', 'answer_mask', 'full_ids', 'full_mask', 'full_loss_mask'], batched = True)
+    dataset = dataset.map(get_image, batch_size = batch_size, remove_columns = ['question_ids', 'question_mask', 'answer_ids', 'answer_mask', 'full_ids', 'full_mask', 'full_loss_mask'], batched = True, keep_in_memory=True)
     dataset.save_to_disk("./data/image")
     return dataset
 
 
 if __name__ == '__main__':
-    dataset = CoT_image(1000)
+    dataset = CoT_image()
     print(dataset)
-    print(dataset[0])

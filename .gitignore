@@ -2,10 +2,11 @@
 .tmp.drivedownload
 .vscode
 results
-logs
+log.txt
 data
 bad_data
 env.sif
+=0.26.0
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
