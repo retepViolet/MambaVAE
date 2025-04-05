@@ -1,6 +1,6 @@
 import transformers
 from transformers import TrainingArguments
-from data.Dataset import get_dataset, tokenizer
+from Dataset import get_dataset, tokenizer
 from datasets import load_from_disk
 import torch, os
 from VAE import MambaVAE
@@ -12,8 +12,8 @@ class Trainer(transformers.Trainer):
         ###
         self.no_kl_step = 9000
         self.kl_warmup = 4500
-        self.max_kl_decay = 1
-        self.min_kl_decay = 1e-9
+        self.max_kl_decay = 5e-4
+        self.min_kl_decay = 1e-6
         ###
         self.kl_decay = self.min_kl_decay
         self.mean_logits_loss = 0
@@ -55,6 +55,8 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
+    # torch.autograd.set_detect_anomaly(True)
+
     dataset = load_from_disk("./data/CoT3")
     print(dataset)
     tot = len(dataset)
@@ -70,7 +72,7 @@ if __name__ == '__main__':
         learning_rate = 6e-4,
         warmup_steps = 1000,
         num_train_epochs = 1,
-        logging_steps = 10,
+        logging_steps = 100,
         weight_decay = 0.01,
         ###
         per_device_train_batch_size = 64,
@@ -86,7 +88,7 @@ if __name__ == '__main__':
         output_dir = './results',
         report_to = "none",
         max_grad_norm = 1.0,
-        label_names = ["full_ids", "full_mask", "full_loss_mask", "question_mask"]
+        label_names = ["full_ids", "full_mask", "full_loss_mask", "question_mask", "question_ids"]
     )
     trainer = Trainer(
         model = model,

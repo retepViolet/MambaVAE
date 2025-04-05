@@ -1,6 +1,6 @@
 import torch
 from datasets import load_from_disk
-from data.Dataset import tokenizer
+from Dataset import tokenizer
 from Diffuser import Diffuser
 import transformers
 from transformers import TrainingArguments
