@@ -45,9 +45,9 @@ if __name__ == '__main__':
 
     model = Diffuser()
     training_args = TrainingArguments(
-        learning_rate = 2e-4,
-        lr_scheduler_type = 'cosine',
-        warmup_steps = 1000,
+        learning_rate = 1e-4,
+        lr_scheduler_type = 'constant',
+        # warmup_steps = 1000,
         num_train_epochs = 10,
         logging_steps = 1000,
         ###

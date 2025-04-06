@@ -69,7 +69,7 @@ class Diffuser(nn.Module):
         return states
 
     def forward(self, **data):
-        target, condition = data['target'], data['condition']
+        target, condition = data['target'], data['target'] # data['condition'] ！！！！！！！！！
         # Adding noise
         device = target.device
         timesteps = torch.randint(0, self.T, (target.shape[0],), device = device, dtype = torch.long)
