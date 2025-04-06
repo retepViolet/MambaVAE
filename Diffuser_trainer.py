@@ -36,7 +36,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/CoT3") #.select(range(100))
+    dataset = load_from_disk("./data/image")
     print(dataset)
     tot = len(dataset)
     eval_size= int(tot * 0.05)
@@ -45,20 +45,26 @@ if __name__ == '__main__':
 
     model = Diffuser()
     training_args = TrainingArguments(
-        learning_rate = 1e-4,
-        warmup_steps = 100,
-        num_train_epochs = 1,
-        logging_steps = 100,
+        learning_rate = 2e-4,
+        lr_scheduler_type = 'cosine',
+        warmup_steps = 1000,
+        num_train_epochs = 10,
+        logging_steps = 1000,
         ###
-        per_device_train_batch_size = 512,
-        per_device_eval_batch_size = 512,
+        per_device_train_batch_size = 128,
+        per_device_eval_batch_size = 128,
+        dataloader_num_workers = 16,
         fp16 = True,
-        eval_strategy = 'no', 
-        save_strategy = 'no',
+        eval_strategy = 'epoch', 
+        save_strategy = 'epoch',
+        save_total_limit = 1,
+        load_best_model_at_end = True,
+        metric_for_best_model = 'eval_loss',
+        greater_is_better = False,
         output_dir = './results',
         report_to = "none",
         max_grad_norm = 1.0,
-        label_names = ["full_ids", "full_mask", "full_loss_mask", "question_ids", "question_mask"]
+        label_names = ['target', 'condition'],
     )
     trainer = transformers.Trainer(
         model = model,
@@ -87,5 +93,5 @@ if __name__ == '__main__':
     #   print('targ: ', tokenizer.batch_decode(input_ids2, skip_special_tokens=True)[0])
     # print('###################################################')
 
-    del model.vae
-    torch.save(model.state_dict(), './results/denoiser.pth')
+    # del model.vae
+    # torch.save(model.state_dict(), './results/denoiser.pth')
