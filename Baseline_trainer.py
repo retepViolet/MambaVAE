@@ -1,5 +1,5 @@
 import torch, transformers, os
-from transformers import TrainingArguments, AutoTokenizer, default_data_collator
+from transformers import TrainingArguments, AutoTokenizer
 from Baseline import Baseline
 from datasets import load_from_disk
 
@@ -19,8 +19,9 @@ training_args = TrainingArguments(
     logging_steps = 100,
     weight_decay = 0.01,
     ###
-    per_device_train_batch_size = 64,
-    per_device_eval_batch_size = 64,
+    per_device_train_batch_size = 128,
+    per_device_eval_batch_size = 128,
+    dataloader_num_workers = 16,
     fp16 = True,
     eval_strategy = 'epoch',
     save_strategy = 'epoch',
@@ -46,6 +47,5 @@ trainer = Trainer(
     args = training_args,
     train_dataset = train_dataset,
     eval_dataset = eval_dataset,
-    data_collator=default_data_collator
 )
 trainer.train()
