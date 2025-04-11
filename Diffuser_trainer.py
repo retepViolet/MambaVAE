@@ -54,7 +54,7 @@ if __name__ == '__main__':
         per_device_train_batch_size = 128,
         per_device_eval_batch_size = 128,
         dataloader_num_workers = 16,
-        fp16 = True,
+        bf16 = True,
         eval_strategy = 'epoch', 
         save_strategy = 'epoch',
         save_total_limit = 1,

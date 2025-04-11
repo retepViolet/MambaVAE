@@ -38,7 +38,7 @@ class Diffuser(nn.Module):
         self.reduce_states1 = nn.Linear(16, 8)
         self.reduce_states2 = nn.Linear(1536, 512)
         # embeds
-        self.pos_embeds = init_embeds(768, 16)
+        self.pos_embeds = init_embeds(768, 8)
         self.time_linear = nn.Linear(256, 1536)
         nn.init.zeros_(self.time_linear.weight)
         nn.init.zeros_(self.time_linear.bias)
@@ -56,8 +56,7 @@ class Diffuser(nn.Module):
         states = torch.cat([states, condition], dim = 1)
         states = self.expand_states(states).transpose(1, 2)
         # denoiser
-        pred = self.denoiser(inputs_embeds = input_embds, 
-                             attention_mask = torch.ones(input_embds.shape[0], 16, device = input_embds.device, dtype = torch.long),
+        pred = self.denoiser(inputs_embeds = input_embds,
                              inputs_ssm_states = states, 
                              inputs_ssm_layer = -1, 
                              output_ssm_last_states = True).ssm_last_states
@@ -76,7 +75,7 @@ class Diffuser(nn.Module):
         return states
 
     def forward(self, **data):
-        target, condition = data['target'], data['target'] # condition
+        target, condition = data['target'], data['condition'] # condition
         # Adding noise
         device = target.device
         timesteps = torch.randint(0, self.T, (target.shape[0],), device = device, dtype = torch.long)
