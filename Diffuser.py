@@ -35,8 +35,8 @@ class Diffuser(nn.Module):
     def generate(self, condition, T = None):
         self.eval()
         self.noise_scheduler.set_timesteps(T if T is not None else self.T)
-        states = torch.randn(condition.shape[0], 8, 512, device = 'cuda')
-        for t in tqdm(self.noise_scheduler.timesteps):
+        states = torch.randn(condition.shape[0], 8, 512, device = condition.device)
+        for t in tqdm(self.noise_scheduler.timesteps, desc="Generating samples"):
             timestep = torch.tensor([t]*condition.shape[0], device = condition.device, dtype = torch.long)
             pred = self.predict(states, condition, timestep)
             states = self.noise_scheduler.step(pred, t, states).prev_sample

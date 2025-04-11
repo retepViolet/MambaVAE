@@ -10,7 +10,8 @@ import random
 class Trainer(transformers.Trainer):
     def evaluate(self, eval_dataset = None, ignore_keys = None, metric_key_prefix: str = "eval"):
         # 获取 dataloader
-        random_indices = random.sample(range(len(eval_dataset)), 1280)
+        if eval_dataset is None: eval_dataset = self.eval_dataset
+        random_indices = random.sample(range(len(eval_dataset)), min(1024, len(eval_dataset)))
         eval_dataloader = self.get_eval_dataloader(eval_dataset.select(random_indices))
 
         self.model.eval()
@@ -20,16 +21,17 @@ class Trainer(transformers.Trainer):
             # 放到 device 上
             batch = {k: v.to(self.args.device) for k, v in batch.items()}
             with torch.no_grad():
-                outputs = self.model.generate(batch['condition'])
+                outputs = self.model.generate(batch['condition'], T = 100)
             loss = torch.nn.functional.mse_loss(outputs, batch['target'])
             avg_loss += loss / len(eval_dataloader)
 
         self.model.train()
+        print(f'eval_loss: {avg_loss.item()}')
         return {f"{metric_key_prefix}_loss": avg_loss.item()}
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/image").select(range(10000))
+    dataset = load_from_disk("./data/image") #.select(range(100000))
     print(dataset)
     tot = len(dataset)
     eval_size= int(tot * 0.05)
@@ -45,7 +47,7 @@ if __name__ == '__main__':
         logging_steps = 1000,
         ###
         per_device_train_batch_size = 128,
-        per_device_eval_batch_size = 128,
+        per_device_eval_batch_size = 1024,
         dataloader_num_workers = 16,
         bf16 = True,
         eval_strategy = 'epoch', 
