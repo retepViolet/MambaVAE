@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-# from InitMamba import MambaForCausalLM
-from transformers import MambaForCausalLM
+from InitMamba import MambaForCausalLM
 
 
 class Baseline(nn.Module):
@@ -11,7 +10,7 @@ class Baseline(nn.Module):
 
     def forward(self, **data):
         input_ids, attention_mask, loss_mask = data['full_ids'], data['full_mask'], data['full_loss_mask']
-        res = self.backbone(input_ids = input_ids[:,:8], 
-                            attention_mask = attention_mask[:,:8],)
-                            # loss_mask = loss_mask)
+        res = self.backbone(input_ids = input_ids, 
+                            attention_mask = attention_mask,
+                            loss_mask = loss_mask)
         return res
