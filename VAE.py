@@ -26,7 +26,6 @@ class MambaVAE(nn.Module):
         states = self.encoder(input_ids = input_ids, 
                     attention_mask = attention_mask, 
                     output_ssm_last_states = True).ssm_last_states
-        self.ssm_dtype = states.dtype
         states = self.mlp1(states).transpose(1,2)
         return self.get_mean(states), self.get_log_var(states)
     
@@ -35,7 +34,7 @@ class MambaVAE(nn.Module):
         return self.decoder(input_ids = input_ids,
                   attention_mask = attention_mask,
                   loss_mask = loss_mask,
-                  inputs_ssm_states = states.to(self.ssm_dtype),
+                  inputs_ssm_states = states,
                   inputs_ssm_layer = 11,
                   labels = input_ids)
     

@@ -128,5 +128,10 @@ def CoT_image(tot = None, batch_size = 1024):
 
 
 if __name__ == '__main__':
-    dataset = CoT_image()
+    dataset = load_from_disk("./data/image")
+    tokens = load_from_disk("./data/CoT3")
+    for col in tokens.column_names:
+        print(col)
+        dataset = dataset.add_column(col, tokens[col])
     print(dataset)
+    dataset.save_to_disk("./data/CoT")
