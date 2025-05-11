@@ -65,9 +65,11 @@ class Diffuser(nn.Module):
         states = torch.randn(input_ids.shape[0], 8, 512, device = input_ids.device)
         # states = self.noise_scheduler.add_noise(target, states, torch.tensor([300]*input_ids.shape[0], device = input_ids.device, dtype = torch.long)).to(target.dtype)
         for t in tqdm(self.noise_scheduler.timesteps, desc="Generating samples", disable = not progress_bar):
-            timestep = torch.tensor([t]*input_ids.shape[0], device = input_ids.device, dtype = torch.long)
+            timestep = torch.full((input_ids.shape[0],), t, device=input_ids.device, dtype=torch.long)
             condition = self.mamba_predict(states, input_ids, attention_mask, timestep)
-            pred = self.tf_predict(states, condition, timestep)
+            pred_uncond = self.tf_predict(states, torch.zeros_like(condition), timestep)
+            pred_cond = self.tf_predict(states, condition, timestep)
+            pred = pred_uncond + 1 * (pred_cond - pred_uncond)
             states = self.noise_scheduler.step(pred, t, states).prev_sample
         return states
     
@@ -89,11 +91,16 @@ class Diffuser(nn.Module):
         target = data['target']
         noisy_states, timesteps, noise = self.diff_prepare(target)
         v = self.velocity(target, noise, timesteps)
-        # Predict and loss
+        # Predict and loss 
+        # condition = self.mamba_predict(noisy_states, data['full_ids'], data['full_mask'], timesteps)
         condition = self.mamba_predict(noisy_states, data['question_ids'], data['question_mask'], timesteps)
+        mask = (torch.rand(condition.shape[0], device=condition.device) < 0.9).to(condition.dtype)
+        condition = condition * mask[:, None, None]
         pred = self.tf_predict(noisy_states, condition, timesteps)
         mse_loss = self.loss_fn(pred, v)
-        return (mse_loss, pred, timesteps)
+        # logits_loss = self.vae.decode(condition, data['full_ids'], data['full_mask'], data['full_loss_mask']).loss
+        # logits_loss = logits_loss + self.loss_fn(condition, target)
+        return (mse_loss, mse_loss, 0)
 
 
 

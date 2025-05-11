@@ -55,3 +55,7 @@ logits_loss: 4.0986647605896; mse_loss: 0.09623508155345917
 发现并没有所谓的突然变容易，loss和noise占比的关系是比较连续的。
 
 v_prediction: logits_loss: 1.0539296865463257; mse_loss: 0.1725289523601532
+
+v_prediction的完整训练：logits_loss: 3.836989402770996; mse_loss: 0.12368296831846237
+
+## 5.5

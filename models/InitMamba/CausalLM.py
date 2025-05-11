@@ -22,7 +22,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         **kwargs,
     ):
         # Overwitten -- uses `cache_params` as opposed to `past_key_values`
-        if inputs_ssm_layer is None: inputs_ssm_layer = 23
+        if inputs_ssm_layer is None: inputs_ssm_layer = 11
         if use_cache:
             # `cache_position` should have been initialized in `generate`
             if cache_position is None:
