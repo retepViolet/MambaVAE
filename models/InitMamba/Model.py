@@ -23,12 +23,17 @@ class MambaModel(modeling_mamba.MambaModel):
         input_ids: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_embeds: modeling_mamba.Optional[torch.LongTensor] = None,
         layer_range: modeling_mamba.Optional[range] = None,
-        inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
+        inputs_ssm_states: modeling_mamba.Optional[
+            modeling_mamba.Union[
+                modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor],
+                modeling_mamba.torch.FloatTensor,
+            ]
+        ] = None,
         inputs_ssm_layer: modeling_mamba.Optional[int] = None,
         cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
         use_cache: modeling_mamba.Optional[bool] = None,
         output_hidden_states: modeling_mamba.Optional[bool] = None,
-        output_ssm_last_states: modeling_mamba.Optional[bool] = None,
+        output_ssm_layer: modeling_mamba.Optional[int] = None,
         return_dict: modeling_mamba.Optional[bool] = None,
         cache_position: modeling_mamba.Optional[torch.LongTensor] = None,
         attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
@@ -41,6 +46,8 @@ class MambaModel(modeling_mamba.MambaModel):
 
         if (input_ids is None) ^ (inputs_embeds is not None):  # ^ is python for xor
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+
+        if inputs_ssm_layer is None: inputs_ssm_layer = 11
 
         if inputs_embeds is None:
             inputs_embeds = self.embeddings(input_ids)
@@ -67,16 +74,21 @@ class MambaModel(modeling_mamba.MambaModel):
             cache_params = None
 
         hidden_states = inputs_embeds
-        all_hidden_states = () if output_hidden_states else None
-        all_ssm_last_states = () if output_ssm_last_states else None
+        all_hidden_states = () if output_hidden_states is not None else None
+        all_ssm_last_states = () if output_ssm_layer is not None else None
         if layer_range is None: layer_range = range(self.config.num_hidden_layers)
         if inputs_ssm_layer is None: inputs_ssm_layer = self.config.num_hidden_layers - 1
         for i in layer_range:
+            states = None
+            if inputs_ssm_states is tuple:
+                states = inputs_ssm_states[i]
+            elif i == inputs_ssm_layer:
+                states = inputs_ssm_states
             if self.gradient_checkpointing and self.training:
                 hidden_states, ssm_last_states = self._gradient_checkpointing_func(
                     self.layers[i].__call__, 
                     hidden_states, 
-                    inputs_ssm_states if i == inputs_ssm_layer or inputs_ssm_layer == -1 else None, 
+                    states, 
                     cache_params, 
                     cache_position, 
                     attention_mask
@@ -84,7 +96,7 @@ class MambaModel(modeling_mamba.MambaModel):
             else:
                 hidden_states, ssm_last_states = self.layers[i](
                     hidden_states,
-                    inputs_ssm_states=inputs_ssm_states if i == inputs_ssm_layer or inputs_ssm_layer == -1 else None,
+                    inputs_ssm_states=states,
                     cache_params=cache_params,
                     cache_position=cache_position,
                     attention_mask=attention_mask,
@@ -93,8 +105,11 @@ class MambaModel(modeling_mamba.MambaModel):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
-            if output_ssm_last_states:
-                all_ssm_last_states = ssm_last_states
+            if output_ssm_layer is not None:
+                if output_ssm_layer == -1:
+                    all_ssm_last_states = all_ssm_last_states + (ssm_last_states,)
+                elif output_ssm_layer == i:
+                    all_ssm_last_states = ssm_last_states
 
             if i == self.config.num_hidden_layers - 1:
                 hidden_states = self.norm_f(hidden_states)

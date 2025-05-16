@@ -17,7 +17,12 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
         cache_position: modeling_mamba.Optional[torch.LongTensor] = None,
         attention_mask: modeling_mamba.Optional[torch.LongTensor] = None,
-        inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
+        inputs_ssm_states: modeling_mamba.Optional[
+            modeling_mamba.Union[
+                modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor],
+                modeling_mamba.torch.FloatTensor,
+            ]
+        ] = None,
         inputs_ssm_layer: modeling_mamba.Optional[int] = None,
         **kwargs,
     ):
@@ -74,12 +79,17 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
         loss_mask: modeling_mamba.Optional[torch.LongTensor] = None,
         inputs_embeds: modeling_mamba.Optional[torch.FloatTensor] = None,
         layer_range: modeling_mamba.Optional[range] = None,
-        inputs_ssm_states: modeling_mamba.Optional[torch.FloatTensor] = None,
+        inputs_ssm_states: modeling_mamba.Optional[
+            modeling_mamba.Union[
+                modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor],
+                modeling_mamba.torch.FloatTensor,
+            ]
+        ] = None,
         inputs_ssm_layer: modeling_mamba.Optional[int] = None,
         cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None,
         labels: modeling_mamba.Optional[torch.LongTensor] = None,
         output_hidden_states: modeling_mamba.Optional[bool] = None,
-        output_ssm_last_states: modeling_mamba.Optional[bool] = None,
+        output_ssm_layer: modeling_mamba.Optional[int] = None,
         return_dict: modeling_mamba.Optional[bool] = None,
         use_cache: modeling_mamba.Optional[bool] = None,
         cache_position: modeling_mamba.Optional[torch.Tensor] = None,
@@ -101,7 +111,7 @@ class MambaForCausalLM(modeling_mamba.MambaForCausalLM):
             inputs_ssm_states=inputs_ssm_states,
             inputs_ssm_layer=inputs_ssm_layer,
             output_hidden_states=output_hidden_states,
-            output_ssm_last_states=output_ssm_last_states,
+            output_ssm_layer=output_ssm_layer,
             return_dict=return_dict,
             use_cache=use_cache,
             cache_position=cache_position,

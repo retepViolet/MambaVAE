@@ -27,7 +27,12 @@ class MambaCausalLMOutput(modeling_mamba.ModelOutput):
     logits: modeling_mamba.Optional[modeling_mamba.torch.FloatTensor] = None
     cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None
     hidden_states: modeling_mamba.Optional[modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor]] = None
-    ssm_last_states: modeling_mamba.Optional[modeling_mamba.torch.FloatTensor] = None
+    ssm_last_states: modeling_mamba.Optional[
+        modeling_mamba.Union[
+            modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor],
+            modeling_mamba.torch.FloatTensor,
+        ]
+    ] = None
 
 
 @modeling_mamba.dataclass
@@ -53,4 +58,9 @@ class MambaOutput(modeling_mamba.ModelOutput):
     last_hidden_state: modeling_mamba.Optional[modeling_mamba.torch.FloatTensor] = None
     cache_params: modeling_mamba.Optional[modeling_mamba.MambaCache] = None
     hidden_states: modeling_mamba.Optional[modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor]] = None
-    ssm_last_states: modeling_mamba.Optional[modeling_mamba.torch.FloatTensor] = None
+    ssm_last_states: modeling_mamba.Optional[
+        modeling_mamba.Union[
+            modeling_mamba.Tuple[modeling_mamba.torch.FloatTensor],
+            modeling_mamba.torch.FloatTensor,
+        ]
+    ] = None
