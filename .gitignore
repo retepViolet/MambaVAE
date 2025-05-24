@@ -3,10 +3,12 @@
 .vscode
 results
 log.txt
+log2.txt
 data
 bad_data
 env.sif
 =0.26.0,
+=0.26.0
 mamba/
 
 # Byte-compiled / optimized / DLL files

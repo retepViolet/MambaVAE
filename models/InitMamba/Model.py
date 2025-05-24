@@ -82,6 +82,8 @@ class MambaModel(modeling_mamba.MambaModel):
             states = None
             if inputs_ssm_states is tuple:
                 states = inputs_ssm_states[i]
+            elif inputs_ssm_states.dim() == 4:
+                states = inputs_ssm_states[:, i]
             elif i == inputs_ssm_layer:
                 states = inputs_ssm_states
             if self.gradient_checkpointing and self.training:

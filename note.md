@@ -58,4 +58,6 @@ v_prediction: logits_loss: 1.0539296865463257; mse_loss: 0.1725289523601532
 
 v_prediction的完整训练：logits_loss: 3.836989402770996; mse_loss: 0.12368296831846237
 
-## 5.5
+## 5.20
+
+目前最好的结果是0.22，使用了batchnorm的连续ar模型。同时传回teacher loss，student loss和logits loss。
