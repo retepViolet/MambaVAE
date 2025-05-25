@@ -79,8 +79,9 @@ class MambaModel(modeling_mamba.MambaModel):
         if layer_range is None: layer_range = range(self.config.num_hidden_layers)
         if inputs_ssm_layer is None: inputs_ssm_layer = self.config.num_hidden_layers - 1
         for i in layer_range:
-            states = None
-            if inputs_ssm_states is tuple:
+            if inputs_ssm_states is None:
+                states = None
+            elif isinstance(inputs_ssm_states, tuple):
                 states = inputs_ssm_states[i]
             elif inputs_ssm_states.dim() == 4:
                 states = inputs_ssm_states[:, i]

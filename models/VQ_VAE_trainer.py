@@ -11,7 +11,8 @@ from tqdm import tqdm
 class Trainer(transformers.Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mean_logits_loss = 0
+        self.mean_teacher_loss = 0
+        self.mean_student_loss = 0
         self.mean_vq_loss = 0
         self.current_step = 0
         self.all_indices = []
@@ -72,12 +73,13 @@ class Trainer(transformers.Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         # ratio = 1 / (300 - min(self.current_step, 299))
         outputs = model(**inputs)
-        logits_loss, vq_loss, _, _, indices = outputs
-        total_loss = logits_loss + vq_loss
+        teacher_loss, student_loss, vq_loss, indices = outputs
+        total_loss = teacher_loss + student_loss + vq_loss
         # 收集所有indices
         self.all_indices.append(indices.detach())
         self.mean_vq_loss += vq_loss.item() / self.args.logging_steps
-        self.mean_logits_loss += logits_loss.item() / self.args.logging_steps
+        self.mean_teacher_loss += teacher_loss.item() / self.args.logging_steps
+        self.mean_student_loss += student_loss.item() / self.args.logging_steps
         return (total_loss, outputs) if return_outputs else total_loss
 
     def training_step(self, model, inputs, num_items_in_batch=None):
@@ -88,12 +90,14 @@ class Trainer(transformers.Trainer):
             all_indices = torch.cat(self.all_indices, dim=0)
             unique_indices = torch.unique(all_indices).numel()
             self.log({
-                "----> logits_loss": self.mean_logits_loss,
+                "----> teacher_loss": self.mean_teacher_loss,
+                "student_loss": self.mean_student_loss,
                 "vq_loss": self.mean_vq_loss,
                 "usage_rate": unique_indices / model.vector_quantizer.num_embeddings,
             })
             self.mean_vq_loss = 0
-            self.mean_logits_loss = 0
+            self.mean_teacher_loss = 0
+            self.mean_student_loss = 0
             self.all_indices = []
         return loss
 
@@ -104,7 +108,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/CoT3") #.select(range(1000))
+    dataset = load_from_disk("./data/CoT3").select(range(10000))
     print(dataset)
     tot = len(dataset)
     eval_size = int(tot * 0.05)
@@ -112,12 +116,12 @@ if __name__ == '__main__':
     eval_dataset = dataset.select(range(eval_size))
 
     model = MambaVQVAE()
-    model.load_state_dict(torch.load('./results/vqvae/model.pth'))
+    # model.load_state_dict(torch.load('./results/vqvae/model.pth'))
     training_args = TrainingArguments(
-        learning_rate = 6e-4,
+        learning_rate = 4e-4,
         warmup_steps = 100,
-        num_train_epochs = 2,
-        logging_steps = 100,
+        num_train_epochs = 1,
+        logging_steps = 10,
         # weight_decay = 0.01,
         per_device_train_batch_size = 64,
         per_device_eval_batch_size = 64,
@@ -132,8 +136,7 @@ if __name__ == '__main__':
         output_dir = './results',
         report_to = "none",
         max_grad_norm = 1.0,
-        label_names = ['target', 'condition', "full_ids", "full_mask", "full_loss_mask", 
-                        "question_mask", "question_ids", "answer_ids", "answer_mask"],
+        label_names = ["question_mask", "question_ids", "answer_ids", "answer_mask"],
     )
     trainer = Trainer(
         model=model,
