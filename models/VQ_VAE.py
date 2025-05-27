@@ -56,13 +56,14 @@ class VectorQuantizer(nn.Module):
 class MambaVQVAE(nn.Module):
     def __init__(self, num_embeddings = 4096):
         super().__init__()
-        config = MambaConfig.from_pretrained('state-spaces/mamba-130m-hf')
-        self.teacher = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf', config=config)
+        self.vector_quantizer = VectorQuantizer(num_embeddings, 64)
+        self.teacher = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
         self.lin_out = nn.Linear(16, 1)
         self.norm = nn.LayerNorm(1536)
         self.lin_in = nn.Linear(1, 16)
-        self.student = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf', config=config)
-        self.vector_quantizer = VectorQuantizer(num_embeddings, 64)
+        self.student = MambaModel.from_pretrained('state-spaces/mamba-130m-hf')
+        self.output_layer = nn.Linear(64, num_embeddings)
+        self.first_embedding = nn.Parameter(torch.randn(1, 1, 768))
     
     def generate(self, input_ids, attention_mask):
         question_states = self.student(input_ids, attention_mask, output_ssm_layer = -1).ssm_last_states
@@ -86,23 +87,28 @@ class MambaVQVAE(nn.Module):
         states = self.lin_out(states).squeeze(-1)
         states = self.norm(states)
         vq_loss, z_q, indices = self.vector_quantizer(states)
-        z_q = self.lin_in(z_q.unsqueeze(-1))
-        teacher_loss = self.teacher(answer_ids, answer_mask, inputs_ssm_states = z_q).loss
+        states = self.lin_in(z_q.unsqueeze(-1))
+        teacher_loss = self.teacher(answer_ids, answer_mask, inputs_ssm_states = states + question_states).loss
         return teacher_loss, vq_loss, z_q, indices
+
+    def student_forward(self, question_states, z_q, indices):
+        inputs_embeds = z_q.reshape(-1, 48, 768)
+        inputs_embeds = torch.cat([self.first_embedding.expand(inputs_embeds.shape[0], -1, -1), 
+                                   inputs_embeds[:, :-1]], dim=1)
+        embeds = self.student(inputs_embeds = inputs_embeds, inputs_ssm_states = question_states).last_hidden_state
+        embeds = embeds.reshape(-1, 48 * 12, self.vector_quantizer.embedding_dim)
+        logits = self.output_layer(embeds)
+        student_loss = F.cross_entropy(logits.reshape(-1, self.vector_quantizer.num_embeddings), indices.reshape(-1))
+        return student_loss
      
     def forward(self, **data):
+        # teacher
         question_states = self.teacher(data['question_ids'], data['question_mask'], output_ssm_layer = -1).ssm_last_states
+        question_states = torch.stack(question_states, dim = 1)
         teacher_loss, vq_loss, z_q, indices = self.teacher_forward(question_states, data['answer_ids'], data['answer_mask'])
-
         # student
-        # question_states = self.student(data['question_ids'], data['question_mask'], output_ssm_layer = -1).ssm_last_states
-        # first_embedding = self.student.embeddings.word_embeddings.weight[0].unsqueeze(0).unsqueeze(0).expand(z_q.shape[0], 1, -1)
-        # padded_z_q = torch.cat([first_embedding, z_q], dim=1)
-        # padded_indices = torch.cat([torch.zeros((indices.shape[0], 1), dtype=torch.long, device=indices.device), indices], dim=1)
-        # student_res = self.student(inputs_embeds = padded_z_q,
-        #                             inputs_ssm_states = question_states,
-        #                             labels = padded_indices)
-        return teacher_loss, torch.tensor(0.0).cuda(), vq_loss, indices
+        student_loss = self.student_forward(question_states, z_q, indices)
+        return teacher_loss, student_loss, vq_loss, indices
 
 
 if __name__ == '__main__':

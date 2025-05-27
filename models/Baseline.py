@@ -9,8 +9,6 @@ class Baseline(nn.Module):
         self.backbone = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
 
     def forward(self, **data):
-        input_ids, attention_mask, loss_mask = data['full_ids'], data['full_mask'], data['full_loss_mask']
-        res = self.backbone(input_ids = input_ids, 
-                            attention_mask = attention_mask,
-                            loss_mask = loss_mask)
-        return res
+        question_states = self.backbone(data['question_ids'], data['question_mask'], output_ssm_layer = -1)
+        res = self.backbone(data['answer_ids'], data['answer_mask'])
+        return (res.loss + question_states.loss, )

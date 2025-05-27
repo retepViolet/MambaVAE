@@ -58,13 +58,13 @@ class MambaMixer(modeling_mamba.MambaMixer):
             conv_weights = self.conv1d.weight.view(self.conv1d.weight.size(0), self.conv1d.weight.size(2))
             if cache_params is not None and cache_position[0] > 0:
                 hidden_states = modeling_mamba.causal_conv1d_update(
-                    hidden_states.squeeze(-1),
+                    hidden_states, #.squeeze(-1) ????????????????????????
                     cache_params.conv_states[self.layer_idx],
                     conv_weights,
                     self.conv1d.bias,
                     self.activation,
                 )
-                hidden_states = hidden_states.unsqueeze(-1)
+                # hidden_states = hidden_states.unsqueeze(-1) # ?????????????????
             else:
                 if cache_params is not None:
                     conv_states = nn.functional.pad(
@@ -89,7 +89,8 @@ class MambaMixer(modeling_mamba.MambaMixer):
             A = -torch.exp(self.A_log.float())
             # 3.c perform the recurrence y ← SSM(A, B, C)(x)
             time_proj_bias = self.dt_proj.bias.float() if hasattr(self.dt_proj, "bias") else None
-            if cache_params is not None and cache_position[0] > 0:
+            if cache_params is not None and cache_position[0] > 0 and inputs_ssm_states is None:
+                print("hello world")
                 scan_outputs = selective_state_update(
                     cache_params.ssm_states[self.layer_idx],
                     hidden_states[..., 0],

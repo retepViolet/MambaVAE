@@ -13,14 +13,14 @@ eval_dataset = dataset.select(range(eval_size))
 model = Baseline().cuda()
 
 training_args = TrainingArguments(
-    learning_rate = 6e-4,
-    warmup_steps = 1000,
+    learning_rate = 4e-4,
+    warmup_steps = 100,
     num_train_epochs = 1,
     logging_steps = 100,
-    weight_decay = 0.01,
+    # weight_decay = 0.01,
     ###
-    per_device_train_batch_size = 128,
-    per_device_eval_batch_size = 128,
+    per_device_train_batch_size = 64,
+    per_device_eval_batch_size = 64,
     dataloader_num_workers = 16,
     fp16 = True,
     eval_strategy = 'epoch',
@@ -33,7 +33,7 @@ training_args = TrainingArguments(
     output_dir = './results',
     report_to = "none",
     max_grad_norm = 1.0,
-    label_names = ["full_ids", "full_mask", "full_loss_mask"],
+    label_names = ["question_mask", "question_ids", "answer_ids", "answer_mask"],
 )
 
 class Trainer(transformers.Trainer):

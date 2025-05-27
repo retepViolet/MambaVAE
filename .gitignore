@@ -6,6 +6,7 @@ log.txt
 log2.txt
 data
 bad_data
+miniconda3/
 env.sif
 =0.26.0,
 =0.26.0
@@ -182,3 +183,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+Anaconda3-2023.09-0-Linux-x86_64.sh
+Anaconda3-2023.09-0-Linux-x86_64.sh
+Miniconda3-latest-Linux-x86_64.sh

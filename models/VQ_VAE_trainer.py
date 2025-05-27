@@ -108,7 +108,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/CoT3").select(range(10000))
+    dataset = load_from_disk("./data/CoT3") #.select(range(10000))
     print(dataset)
     tot = len(dataset)
     eval_size = int(tot * 0.05)
@@ -121,7 +121,7 @@ if __name__ == '__main__':
         learning_rate = 4e-4,
         warmup_steps = 100,
         num_train_epochs = 1,
-        logging_steps = 10,
+        logging_steps = 100,
         # weight_decay = 0.01,
         per_device_train_batch_size = 64,
         per_device_eval_batch_size = 64,
@@ -133,7 +133,7 @@ if __name__ == '__main__':
         load_best_model_at_end = True,
         metric_for_best_model = 'loss',
         greater_is_better = False,
-        output_dir = './results',
+        output_dir = './results/vqCoT',
         report_to = "none",
         max_grad_norm = 1.0,
         label_names = ["question_mask", "question_ids", "answer_ids", "answer_mask"],
@@ -146,30 +146,3 @@ if __name__ == '__main__':
     )
     trainer.train()
     # print(trainer.evaluate())
-
-    # final test --------------------
-    # model.train()
-    # for i in range(3):
-    #     data = {}
-    #     for key in train_dataset[i].keys():
-    #         data[key] = torch.tensor(train_dataset[i][key], device='cuda').unsqueeze(0)
-    #     res = model(**data)
-    #     tokens = res[2].argmax(-1)
-    #     print('=========================')
-    #     print('logits_loss: ', res[0].item(), '; vq_loss: ', res[1].item())
-    #     print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
-    #     print('-------------------------')
-    #     print('targ: ', tokenizer.batch_decode(data['full_ids'][:,1:], skip_special_tokens=True)[0])
-    # print('###################################################')
-    # model.eval()
-    # for i in range(3):
-    #     data = {}
-    #     for key in eval_dataset[i].keys():
-    #         data[key] = torch.tensor(eval_dataset[i][key], device='cuda').unsqueeze(0)
-    #     res = model(**data)
-    #     tokens = res[2].argmax(-1)
-    #     print('=========================')
-    #     print('logits_loss: ', res[0].item(), '; vq_loss: ', res[1].item())
-    #     print('pred: ', tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
-    #     print('-------------------------')
-    #     print('targ: ', tokenizer.batch_decode(data['full_ids'][:,1:], skip_special_tokens=True)[0])
