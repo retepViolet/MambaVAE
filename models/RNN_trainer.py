@@ -55,7 +55,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/CoT3").select(range(10000))
+    dataset = load_from_disk("./data/CoT3").select(range(1000))
     print(dataset)
     tot = len(dataset)
     eval_size = int(tot * 0.05)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     model = MambaRNN()
 
     training_args = TrainingArguments(
-        learning_rate = 4e-4,
+        learning_rate = 1e-4,
         warmup_steps = 100,
         num_train_epochs = 1,
         logging_steps = 100,
