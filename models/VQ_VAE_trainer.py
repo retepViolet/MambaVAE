@@ -17,58 +17,59 @@ class Trainer(transformers.Trainer):
         self.current_step = 0
         self.all_indices = []
 
-    def calculate_token_match(self, pred, target):
-        answer_pos = (pred == 50279).nonzero(as_tuple=True)[0]
-        if len(answer_pos) == 0:
-            return 0.0
-        target_set = set(target[1:].tolist())
-        target_set.discard(0)
-        pred_set = set(pred[answer_pos[0]+1:].tolist())
-        pred_set.discard(0)
-        matched = len(target_set.intersection(pred_set))
-        if len(target_set) == 0:
-            return 0.0
-        return matched / len(target_set)
+    def calculate_em_score(self, pred_tokens, target_tokens):
+        pred_clean = pred_tokens[pred_tokens != 0]
+        target_clean = target_tokens[target_tokens != 0]
+        # print("预测输出:", tokenizer.decode(pred_clean, skip_special_tokens=True))
+        # print('--------------------------------')
+        # print("目标输出:", tokenizer.decode(target_clean, skip_special_tokens=True))
+        # print('================================')
+        return 1.0 if len(pred_clean) == len(target_clean) and torch.equal(pred_clean, target_clean) else 0.0
 
-    # @torch.no_grad()
-    # def evaluate(self, eval_dataset = None, ignore_keys = None, metric_key_prefix: str = "eval_accuracy"):
-    #     if eval_dataset is None: eval_dataset = self.eval_dataset
-    #     # random_indices = random.sample(range(len(eval_dataset)), min(128, len(eval_dataset)))
-    #     eval_dataloader = self.get_eval_dataloader(eval_dataset)
-    #     self.model.eval()
-    #     acc = total_logits_loss = total_vq_loss = num_batches = 0
-    #     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-    #         batch = {k: v.to(self.args.device) for k, v in batch.items()}
-    #         logits_loss, vq_loss, _, z_q, _ = self.model(**batch)
-    #         total_logits_loss += logits_loss.item()
-    #         total_vq_loss += vq_loss.item()
-    #         num_batches += 1
-    #         if num_batches <= 10:
-    #             batch_size = batch['question_ids'].shape[0]
-    #             valid_lengths = batch['question_mask'].sum(dim=1)
-    #             for i in range(batch_size):
-    #                 input_ids = batch['question_ids'][i:i+1, :valid_lengths[i]]
-    #                 tokens = self.model.decoder.generate(
-    #                     input_ids=input_ids,
-    #                     inputs_ssm_states=z_q[i:i+1].reshape(-1, 1536, 16),
-    #                     max_length=256
-    #                 )
-    #                 acc += self.calculate_token_match(tokens[0], batch['answer_ids'][i]) / batch_size * 10
-    #                 # if i < 1:
-    #                 #     print('=========================')
-    #                 #     print('pred: ', tokenizer.decode(tokens[0], skip_special_tokens=True))
-    #                 #     print('-------------------------')
-    #                 #     print('targ: ', tokenizer.decode(batch['full_ids'][i], skip_special_tokens=True))
-
-    #     avg_logits_loss = total_logits_loss / num_batches
-    #     avg_vq_loss = total_vq_loss / num_batches
+    @torch.no_grad()
+    def evaluate(self, eval_dataset = None, ignore_keys = None, metric_key_prefix: str = "eval"):
+        if eval_dataset is None: 
+            eval_dataset = self.eval_dataset
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
+        self.model.eval()
         
-    #     self.model.train()
-    #     print(f'logits_loss: {avg_logits_loss:.4f}; vq_loss: {avg_vq_loss:.4f}; token_match: {acc:.4f}')
-    #     return {
-    #         "eval_accuracy": acc,
-    #         "eval_loss": avg_logits_loss,
-    #     }
+        total_teacher_loss = total_student_loss = total_vq_loss = total_em_score = num_samples = 0
+        for batch in tqdm(eval_dataloader, desc="Evaluating"):
+            batch = {k: v.to(self.args.device) for k, v in batch.items()}
+            # 计算训练损失
+            teacher_loss, student_loss, vq_loss, _ = self.model(**batch)
+            total_teacher_loss += teacher_loss.item()
+            total_student_loss += student_loss.item()
+            total_vq_loss += vq_loss.item()
+            # batch生成评估
+            if num_samples < 10 * batch['question_ids'].shape[0]:
+                input_ids = batch['question_ids']
+                attention_mask = batch['question_mask']
+                answer_ids = batch['answer_ids']
+                answer_mask = batch['answer_mask']
+                tokens = self.model.generate(input_ids=input_ids, attention_mask=attention_mask, answer_ids=answer_ids, answer_mask=answer_mask)
+                # 计算EM分数
+                for i in range(batch['question_ids'].shape[0]):
+                    total_em_score += self.calculate_em_score(tokens[i], batch['answer_ids'][i])
+                    num_samples += 1
+        # 计算平均值
+        num_batches = len(eval_dataloader)
+        avg_teacher_loss = total_teacher_loss / num_batches
+        avg_student_loss = total_student_loss / num_batches
+        avg_vq_loss = total_vq_loss / num_batches
+        avg_em_score = total_em_score / num_samples if num_samples > 0 else 0.0
+        
+        self.model.train()
+        print(f'teacher_loss: {avg_teacher_loss:.4f}; student_loss: {avg_student_loss:.4f}; '
+              f'vq_loss: {avg_vq_loss:.4f}; exact_match: {avg_em_score:.4f}')
+        
+        return {
+            f"{metric_key_prefix}_teacher_loss": avg_teacher_loss,
+            f"{metric_key_prefix}_student_loss": avg_student_loss,
+            f"{metric_key_prefix}_vq_loss": avg_vq_loss,
+            f"{metric_key_prefix}_exact_match": avg_em_score,
+            f"{metric_key_prefix}_loss": avg_teacher_loss + avg_student_loss + avg_vq_loss,
+        }
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         # ratio = 1 / (300 - min(self.current_step, 299))
@@ -108,7 +109,7 @@ class Trainer(transformers.Trainer):
 
 
 if __name__ == '__main__':
-    dataset = load_from_disk("./data/CoT3") #.select(range(10000))
+    dataset = load_from_disk("./data/CoT3").select(range(10000))
     print(dataset)
     tot = len(dataset)
     eval_size = int(tot * 0.05)
@@ -116,7 +117,7 @@ if __name__ == '__main__':
     eval_dataset = dataset.select(range(eval_size))
 
     model = MambaVQVAE()
-    # model.load_state_dict(torch.load('./results/vqvae/model.pth'))
+    model.load_state_dict(torch.load('./results/vqCoT/checkpoint-18496/model.pth'))
     training_args = TrainingArguments(
         learning_rate = 4e-4,
         warmup_steps = 100,
@@ -144,5 +145,5 @@ if __name__ == '__main__':
         train_dataset=train_dataset,
         eval_dataset=eval_dataset
     )
-    trainer.train()
-    # print(trainer.evaluate())
+    # trainer.train()
+    print(trainer.evaluate())

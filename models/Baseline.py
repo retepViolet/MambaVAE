@@ -8,7 +8,15 @@ class Baseline(nn.Module):
         super().__init__()
         self.backbone = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
 
-    def forward(self, **data):
-        question_states = self.backbone(data['question_ids'], data['question_mask'], output_ssm_layer = -1)
-        res = self.backbone(data['answer_ids'], data['answer_mask'])
-        return (res.loss + question_states.loss, )
+    def generate(self, input_ids, attention_mask):
+        states = self.backbone(input_ids, attention_mask, output_ssm_layer = -1).ssm_last_states
+        batch_size = input_ids.shape[0]
+        device = input_ids.device
+        tokens = self.backbone.generate(input_ids = torch.full((batch_size, 1), 50279, dtype=torch.long, device=device), 
+                                        max_length = 64, inputs_ssm_states = states)
+        return tokens
+
+    def forward(self, question_ids, question_mask, answer_ids, answer_mask):
+        states = self.backbone(question_ids, question_mask, output_ssm_layer = -1).ssm_last_states
+        res = self.backbone(answer_ids, answer_mask, inputs_ssm_states = states)
+        return res

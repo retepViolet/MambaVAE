@@ -65,20 +65,50 @@ class MambaVQVAE(nn.Module):
         self.output_layer = nn.Linear(64, num_embeddings)
         self.first_embedding = nn.Parameter(torch.randn(1, 1, 768))
     
-    def generate(self, input_ids, attention_mask):
-        question_states = self.student(input_ids, attention_mask, output_ssm_layer = -1).ssm_last_states
-        indices = self.student.generate(
-                    input_ids = torch.full((input_ids.shape[0], 1), 0, dtype=torch.long, device=input_ids.device),
-                    inputs_ssm_states = question_states,
-                    max_length = 33
-                )
-        states = self.vector_quantizer.embedding(indices).reshape(-1, 1536, 16)
+    @torch.no_grad()
+    def generate(self, input_ids, attention_mask, answer_ids, answer_mask):
+        question_states = self.teacher(input_ids, attention_mask, output_ssm_layer = -1).ssm_last_states
+        question_states = torch.stack(question_states, dim = 1)
+        
+        batch_size, device = input_ids.shape[0], input_ids.device
+        cache_params = None
+        cache_position = torch.zeros((batch_size,), dtype=torch.long, device=device)
+        all_indices = []
+        
+        # for step in range(48):
+        #     if step == 0:
+        #         inputs_embeds = self.first_embedding.expand(batch_size, -1, -1)
+        #         output = self.student(inputs_embeds=inputs_embeds, inputs_ssm_states=question_states, use_cache=True)
+        #         cache_params = output.cache_params
+        #     else:
+        #         last_vq_embeds = self.vector_quantizer.embedding(all_indices[-1])
+        #         inputs_embeds = last_vq_embeds.reshape(batch_size, 1, 768)
+        #         output = self.student(inputs_embeds=inputs_embeds, use_cache=True, 
+        #                             cache_params=cache_params, cache_position=cache_position.clone())
+            
+        #     cache_position += 1
+        #     hidden_reshaped = output.last_hidden_state.reshape(batch_size, 12, 64)
+        #     logits = self.output_layer(hidden_reshaped)
+        #     all_indices.append(torch.argmax(logits, dim=-1))
+        
+        # # student生成的indices
+        # indices_student = torch.cat(all_indices, dim=1)  # [batch, 48*12=576]
+        
+        # 使用teacher_forward得到正确的indices作为对比
+        _, _, z_q_teacher, indices_teacher = self.teacher_forward(question_states, answer_ids, answer_mask)
+        
+        # 随机修改50%的indices
+        mask = torch.rand_like(indices_teacher.float()) < 0.5
+        random_indices = torch.randint(0, self.vector_quantizer.num_embeddings, indices_teacher.shape, device=device)
+        indices_teacher = torch.where(mask, random_indices, indices_teacher)
+        
+        z_q = self.vector_quantizer.embedding(indices_teacher).reshape(batch_size, 24, 1536)  # [batch, 24, 1536]
+        states = self.lin_in(z_q.unsqueeze(-1))  # [batch, 24, 1536, 16]
+        # print((indices_teacher == indices_student).float().mean())
+        
         tokens = self.teacher.generate(
-                    input_ids = torch.full((indices.shape[0], 1), 50277, dtype=torch.long, device=indices.device),
-                    inputs_ssm_states = states,
-                    inputs_ssm_layer = 0,
-                    max_length = 64
-                )
+                    input_ids = torch.full((batch_size, 1), 50279, dtype=torch.long, device=device),
+                    inputs_ssm_states = states + question_states, max_length = 64)
         return tokens
 
     def teacher_forward(self, question_states, answer_ids, answer_mask):

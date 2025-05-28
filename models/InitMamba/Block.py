@@ -90,7 +90,6 @@ class MambaMixer(modeling_mamba.MambaMixer):
             # 3.c perform the recurrence y ← SSM(A, B, C)(x)
             time_proj_bias = self.dt_proj.bias.float() if hasattr(self.dt_proj, "bias") else None
             if cache_params is not None and cache_position[0] > 0 and inputs_ssm_states is None:
-                print("hello world")
                 scan_outputs = selective_state_update(
                     cache_params.ssm_states[self.layer_idx],
                     hidden_states[..., 0],

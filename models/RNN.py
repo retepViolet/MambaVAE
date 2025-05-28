@@ -8,16 +8,17 @@ class MambaRNN(nn.Module):
         super().__init__()
         self.backbone = MambaForCausalLM.from_pretrained('state-spaces/mamba-130m-hf')
 
+    def generate(self, input_ids, attention_mask):
+        states = self.backbone(input_ids, attention_mask, output_ssm_layer = -1).ssm_last_states
+        batch_size = input_ids.shape[0]
+        device = input_ids.device
+        tokens = self.backbone.generate(input_ids = torch.full((batch_size, 1), 50279, dtype=torch.long, device=device), 
+                                        max_length = 64, inputs_ssm_states = states)
+        return tokens
+
     def forward(self, question_ids, question_mask, answer_ids, answer_mask):
-        res1 = self.backbone(question_ids, question_mask, output_ssm_layer = -1)
-        res = self.backbone(question_ids[:, :99], question_mask[:, :99], output_ssm_layer = -1, use_cache = True)
-        res2 = self.backbone(question_ids[:, 99:], question_mask[:, 99:], output_ssm_layer = -1, inputs_ssm_states = res.ssm_last_states,
-                               use_cache = False, cache_params = res.cache_params, 
-                               cache_position = torch.full((question_ids.size(0),), 1, device='cuda'))
-        print((torch.cat([res.logits, res2.logits], dim = 1) - res1.logits).abs().sum())
-        # self.backbone.generate(question_ids, max_new_tokens = 128, inputs_ssm_states = states,
-        #                        use_cache = True, cache_params = res.cache_params, 
-        #                        cache_position = torch.full((question_ids.size(0),), 1, device='cuda'))
+        states = self.backbone(question_ids, question_mask, output_ssm_layer = -1).ssm_last_states
+        res = self.backbone(answer_ids, answer_mask, inputs_ssm_states = states)
         return res
 
 
